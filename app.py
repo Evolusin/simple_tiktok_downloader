@@ -1,22 +1,22 @@
 from flask import Flask, render_template, request, send_file
 import os
 import yt_dlp as youtube_dl
-import sched
-import time
+import threading
 import uuid
 
 app = Flask(__name__)
-scheduler = sched.scheduler(time.time, time.sleep)
 
-def delete_files():
-    '''
-    This function deletes all files in the downloads folder.
-    '''
-    folder = 'downloads'
-    for filename in os.listdir(folder):
-        file_path = os.path.join(folder, filename)
-        if os.path.isfile(file_path):
-            os.remove(file_path)
+def delete_file_later(path, delay=3600):
+    """Deletes a single file after `delay` seconds (default: 1 hour)."""
+    def _delete():
+        try:
+            if os.path.isfile(path):
+                os.remove(path)
+        except OSError:
+            pass
+    t = threading.Timer(delay, _delete)
+    t.daemon = True
+    t.start()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -52,8 +52,8 @@ def index():
 
             # The file is already saved as new_filename, no need to rename
             video_filename = 'downloads/' + new_filename
-            # Run the delete_files function after 10 minutes
-            scheduler.enter(600, 1, delete_files)
+            # Schedule deletion of this specific file after 1 hour
+            delete_file_later(video_filename, delay=3600)
 
             return send_file(video_filename, as_attachment=True)
         except Exception as e:
